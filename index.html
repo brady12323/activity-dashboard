@@ -278,18 +278,21 @@
                 });
             }, [activities, searchTerm, selectedCategory]);
 
+            // 修改 getCategoryStyle 函數以調整邊框顏色
             const getCategoryStyle = (cat, isSelected) => {
                 const base = "px-4 py-1.5 rounded-full text-sm font-bold border transition-all cursor-pointer whitespace-nowrap shadow-sm";
                 if (cat === '全部') return isSelected ? `${base} bg-slate-800 text-white border-slate-800` : `${base} bg-white text-slate-600 border-slate-200 hover:bg-slate-50`;
+                
+                // 設定邊框顏色與文字顏色一致 (border-x-xxx)
                 const colors = {
-                    '獎勵': isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-100 text-blue-700 border-blue-200',
-                    '戰鬥': isSelected ? 'bg-red-600 text-white border-red-600' : 'bg-red-100 text-red-700 border-red-200',
-                    '系統': isSelected ? 'bg-slate-600 text-white border-slate-600' : 'bg-slate-100 text-slate-700 border-slate-200',
-                    '任務': isSelected ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-100 text-emerald-700 border-emerald-200',
-                    '加倍': isSelected ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-100 text-amber-700 border-amber-200',
-                    '副本': isSelected ? 'bg-purple-600 text-white border-purple-600' : 'bg-purple-100 text-purple-700 border-purple-200',
-                    '裝扮': isSelected ? 'bg-pink-600 text-white border-pink-600' : 'bg-pink-100 text-pink-700 border-pink-200',
-                    '小遊戲': isSelected ? 'bg-orange-600 text-white border-orange-600' : 'bg-orange-100 text-orange-700 border-orange-200',
+                    '獎勵': isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-100 text-blue-700 border-blue-700',
+                    '戰鬥': isSelected ? 'bg-red-600 text-white border-red-600' : 'bg-red-100 text-red-700 border-red-700',
+                    '系統': isSelected ? 'bg-slate-600 text-white border-slate-600' : 'bg-slate-100 text-slate-700 border-slate-700',
+                    '任務': isSelected ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-100 text-emerald-700 border-emerald-700',
+                    '加倍': isSelected ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-100 text-amber-700 border-amber-700',
+                    '副本': isSelected ? 'bg-purple-600 text-white border-purple-600' : 'bg-purple-100 text-purple-700 border-purple-700',
+                    '裝扮': isSelected ? 'bg-pink-600 text-white border-pink-600' : 'bg-pink-100 text-pink-700 border-pink-700',
+                    '小遊戲': isSelected ? 'bg-orange-600 text-white border-orange-600' : 'bg-orange-100 text-orange-700 border-orange-700',
                 };
                 return colors[cat] || (isSelected ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700');
             };
@@ -435,7 +438,7 @@
                                                         </div>
                                                     </td>
                                                     <td className="sticky-col-2 px-5 py-4 border-r border-b group-hover:bg-blue-50/10" style={{ left: colWidths.name }}>
-                                                        <span className="text-xs px-3 py-1 border rounded-full font-bold bg-white text-slate-600 shadow-sm">{act.category}</span>
+                                                        <span className={`text-xs px-3 py-1 border rounded-full font-bold bg-white shadow-sm ${getCategoryStyle(act.category, false)}`}>{act.category}</span>
                                                     </td>
                                                     <td className="sticky-col-3 px-5 py-4 border-r-2 border-b text-center font-black text-blue-600 group-hover:bg-blue-50/20" style={{ left: colWidths.name + colWidths.category }}>{count}</td>
                                                     {act.data.map((cell, cIdx) => (
