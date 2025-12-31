@@ -3,202 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>活動總整理 - 雲端管理系統</title>
+    <title>活動總整理 - 網頁版</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel for JSX -->
+    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Lucide Icons (Vanilla JS version) -->
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         body {
             font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
             font-size: 16px;
         }
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        /* 十字凍結窗格樣式 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* 十字凍結樣式 */
         .sticky-col-1 { position: sticky; left: 0; z-index: 20; background: white; }
         .sticky-col-2 { position: sticky; z-index: 20; background: white; }
         .sticky-col-3 { position: sticky; z-index: 20; background: #eff6ff; } 
         .sticky-header { position: sticky; top: 0; z-index: 50; }
         .sticky-intersect { position: sticky; top: 0; left: 0; z-index: 60; }
         
-        /* 確保表格格線正確 */
         th, td { border: 1px solid #e2e8f0; }
-        
-        /* 管理面板動畫 */
-        .manager-panel {
-            transition: all 0.3s ease-in-out;
-        }
     </style>
 </head>
 <body class="bg-slate-50">
     <div id="root"></div>
 
-    <script type="text/babel" data-type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Firebase 配置
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'activity-dashboard-pro';
-        const apiKey = ""; // Gemini API Key
-
+    <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // ---------------------------------------------------------
-        // 修復後的 Icon 組件：使用正確的 DOM 操作方式渲染圖示
-        // ---------------------------------------------------------
+        // 圖示組件
         const Icon = ({ name, size = 20, className = "" }) => {
             const elementRef = useRef(null);
-
             useEffect(() => {
                 if (window.lucide && elementRef.current) {
-                    // 1. 建立一個暫時的 i 標籤，帶有 data-lucide 屬性
                     const tempIcon = document.createElement('i');
                     tempIcon.setAttribute('data-lucide', name);
-                    
-                    // 2. 清空容器並放入 i 標籤
                     elementRef.current.innerHTML = '';
                     elementRef.current.appendChild(tempIcon);
-                    
-                    // 3. 呼叫 Lucide 將 i 標籤轉換為 SVG
                     window.lucide.createIcons({
                         root: elementRef.current,
-                        attrs: {
-                            width: size,
-                            height: size,
-                            class: className,
-                            'stroke-width': 2,
-                            stroke: 'currentColor'
-                        }
+                        attrs: { width: size, height: size, class: className, 'stroke-width': 2, stroke: 'currentColor' }
                     });
                 }
             }, [name, size, className]);
-
             return <span ref={elementRef} className="inline-flex items-center justify-center"></span>;
         };
 
         function App() {
-            const [user, setUser] = useState(null);
-            const [dates, setDates] = useState([]);
-            const [activities, setActivities] = useState([]);
-            const [loading, setLoading] = useState(true);
+            // 初始資料 (來自您的 Excel)
+            const initialDates = [
+                "2025-07-05", "2025-07-31", "2025-08-28", "2025-09-11", "2025-09-18", 
+                "2025-10-02", "2025-10-15", "2025-10-23", "2025-11-05", "2025-11-27", 
+                "2025-12-18", "2025-12-24"
+            ];
+            const initialActivities = [
+                { name: "登入/簽到好禮", category: "獎勵", data: ["", "O", "", "", "", "", "O", "O", "", "O", "", "O"] },
+                { name: "打怪掉落", category: "戰鬥", data: ["O", "O", "O", "", "", "", "", "O", "", "O", "", "O"] },
+                { name: "兌換商店", category: "系統", data: ["O", "O", "O", "", "", "", "", "", "", "O", "", "O"] },
+                { name: "活動限定任務", category: "任務", data: ["O", "", "O", "O", "", "O", "", "O", "O", "O", "", ""] },
+                { name: "夥伴遠征加倍", category: "加倍", data: ["", "", "", "", "", "", "", "", "", "", "", "O"] },
+                { name: "組織捐獻加倍", category: "加倍", data: ["", "", "", "", "", "", "", "", "", "", "", "O"] },
+                { name: "活動/小遊戲額外獎勵", category: "小遊戲", data: ["", "", "", "", "", "O", "", "", "", "", "", ""] },
+                { name: "活動限定副本", category: "副本", data: ["", "", "", "", "", "", "O", "", "", "", "", ""] },
+                { name: "活動限定協力", category: "副本", data: ["", "", "", "", "", "", "", "", "", "O", "O", "O"] },
+                { name: "活動限定拼圖活動", category: "任務", data: ["", "", "", "", "", "", "", "O", "", "", "", "O"] },
+                { name: "美食歡樂送裝扮", category: "裝扮", data: ["", "", "", "", "", "", "", "", "", "", "O", ""] },
+                { name: "基督村裝扮", category: "裝扮", data: ["", "", "", "", "", "", "", "", "", "", "O", ""] },
+                { name: "心靈之器", category: "系統", data: ["", "", "", "", "", "", "", "", "", "", "", "O"] }
+            ];
+
+            // State
+            const [dates, setDates] = useState(initialDates);
+            const [activities, setActivities] = useState(initialActivities);
             const [searchTerm, setSearchTerm] = useState('');
             const [selectedCategory, setSelectedCategory] = useState('全部');
             const [showManager, setShowManager] = useState(false);
-            
-            // AI 狀態
-            const [isAiLoading, setIsAiLoading] = useState(false);
-            const [aiResult, setAiResult] = useState(null);
-            const [showAiModal, setShowAiModal] = useState(false);
+            const [apiKey, setApiKey] = useState(''); // 讓使用者自行輸入 Key
 
-            // 編輯狀態
-            const [editingActIndex, setEditingActIndex] = useState(null);
-            const [editingActValue, setEditingActValue] = useState('');
-            const [editingDateIndex, setEditingDateIndex] = useState(null);
-            const [editingDateValue, setEditingDateValue] = useState('');
-
-            // 新增表單狀態
+            // 表單 State
             const [newActivityName, setNewActivityName] = useState('');
             const [newActivityCategory, setNewActivityCategory] = useState('獎勵');
             const [newDate, setNewDate] = useState('');
+            
+            // AI Modal
+            const [showAiModal, setShowAiModal] = useState(false);
+            const [aiResult, setAiResult] = useState('');
+            const [isAiLoading, setIsAiLoading] = useState(false);
+            const [showKeyInput, setShowKeyInput] = useState(false);
 
             const categories = ['全部', '獎勵', '戰鬥', '系統', '任務', '加倍', '副本', '裝扮', '小遊戲'];
             const colWidths = { name: 260, category: 110, total: 90 };
 
-            // 1. 登入初始化
+            // 1. 初始化讀取 LocalStorage
             useEffect(() => {
-                const initAuth = async () => {
+                const savedData = localStorage.getItem('activityDashboardData');
+                if (savedData) {
                     try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                    } catch (err) {
-                        console.error("Auth Error:", err);
-                    }
-                };
-                initAuth();
-                const unsubscribe = onAuthStateChanged(auth, setUser);
-                return () => unsubscribe();
+                        const parsed = JSON.parse(savedData);
+                        setDates(parsed.dates || initialDates);
+                        setActivities(parsed.activities || initialActivities);
+                    } catch (e) { console.error("讀取失敗", e); }
+                }
+                
+                const savedKey = localStorage.getItem('geminiApiKey');
+                if (savedKey) setApiKey(savedKey);
             }, []);
 
-            // 2. 雲端同步
-            useEffect(() => {
-                if (!user) return;
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'activities', 'state');
-                
-                const unsubscribe = onSnapshot(docRef, (snapshot) => {
-                    if (snapshot.exists()) {
-                        const data = snapshot.data();
-                        setDates(data.dates || []);
-                        setActivities(data.activities || []);
-                    } else {
-                        // ⭐️ 來自 Excel 的完整初始資料
-                        const initialDates = [
-                            "2025-07-05", "2025-07-31", "2025-08-28", "2025-09-11", "2025-09-18", 
-                            "2025-10-02", "2025-10-15", "2025-10-23", "2025-11-05", "2025-11-27", 
-                            "2025-12-18", "2025-12-24"
-                        ];
-                        const initialActs = [
-                            { name: "登入/簽到好禮", category: "獎勵", data: ["", "O", "", "", "", "", "O", "O", "", "O", "", "O"] },
-                            { name: "打怪掉落", category: "戰鬥", data: ["O", "O", "O", "", "", "", "", "O", "", "O", "", "O"] },
-                            { name: "兌換商店", category: "系統", data: ["O", "O", "O", "", "", "", "", "", "", "O", "", "O"] },
-                            { name: "活動限定任務", category: "任務", data: ["O", "", "O", "O", "", "O", "", "O", "O", "O", "", ""] },
-                            { name: "夥伴遠征加倍", category: "加倍", data: ["", "", "", "", "", "", "", "", "", "", "", "O"] },
-                            { name: "組織捐獻加倍", category: "加倍", data: ["", "", "", "", "", "", "", "", "", "", "", "O"] },
-                            { name: "活動/小遊戲額外獎勵", category: "小遊戲", data: ["", "", "", "", "", "O", "", "", "", "", "", ""] },
-                            { name: "活動限定副本", category: "副本", data: ["", "", "", "", "", "", "O", "", "", "", "", ""] },
-                            { name: "活動限定協力", category: "副本", data: ["", "", "", "", "", "", "", "", "", "O", "O", "O"] },
-                            { name: "活動限定拼圖活動", category: "任務", data: ["", "", "", "", "", "", "", "O", "", "", "", "O"] },
-                            { name: "美食歡樂送裝扮", category: "裝扮", data: ["", "", "", "", "", "", "", "", "", "", "O", ""] },
-                            { name: "基督村裝扮", category: "裝扮", data: ["", "", "", "", "", "", "", "", "", "", "O", ""] },
-                            { name: "心靈之器", category: "系統", data: ["", "", "", "", "", "", "", "", "", "", "", "O"] }
-                        ];
-                        setDoc(docRef, { dates: initialDates, activities: initialActs });
-                    }
-                    setLoading(false);
-                }, (error) => {
-                    console.error("Firestore Sync Error:", error);
-                    setLoading(false);
-                });
+            // 2. 儲存資料到 LocalStorage
+            const saveData = (newDates, newActs) => {
+                setDates(newDates);
+                setActivities(newActs);
+                localStorage.setItem('activityDashboardData', JSON.stringify({
+                    dates: newDates,
+                    activities: newActs
+                }));
+            };
 
-                return () => unsubscribe();
-            }, [user]);
-
-            // 儲存邏輯
-            const saveToCloud = async (newDates, newActs) => {
-                if (!user) return;
-                try {
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'activities', 'state');
-                    await setDoc(docRef, { dates: newDates, activities: newActs });
-                } catch (err) {
-                    console.error("Firestore Save Error:", err);
-                }
+            const saveApiKey = (key) => {
+                setApiKey(key);
+                localStorage.setItem('geminiApiKey', key);
+                setShowKeyInput(false);
             };
 
             // --- Gemini AI ---
             const callGemini = async (prompt, systemPrompt) => {
+                if (!apiKey) {
+                    setShowKeyInput(true);
+                    return;
+                }
                 setIsAiLoading(true);
-                setAiResult(null);
+                setAiResult('');
                 setShowAiModal(true);
 
-                const fetchWithRetry = async (retries = 5, delay = 1000) => {
+                try {
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -207,59 +150,42 @@
                             systemInstruction: { parts: [{ text: systemPrompt }] }
                         })
                     });
-                    if (!response.ok) {
-                        if (retries > 0) {
-                            await new Promise(r => setTimeout(r, delay));
-                            return fetchWithRetry(retries - 1, delay * 2);
-                        }
-                        throw new Error('AI 助手繁忙中');
-                    }
                     const data = await response.json();
-                    return data.candidates?.[0]?.content?.parts?.[0]?.text;
-                };
-
-                try {
-                    const result = await fetchWithRetry();
-                    setAiResult(result);
+                    if (data.error) throw new Error(data.error.message);
+                    setAiResult(data.candidates?.[0]?.content?.parts?.[0]?.text || "無回應");
                 } catch (e) {
-                    setAiResult("連線逾時，請檢查 API 金鑰或網路狀態。");
+                    setAiResult(`錯誤：${e.message}\n(請檢查您的 API Key 是否正確)`);
                 } finally {
                     setIsAiLoading(false);
                 }
             };
 
-            const handleAiHealthCheck = () => {
-                const summary = activities.map(a => `${a.name}(${a.category})`).join(', ');
-                callGemini(`目前的活動清單為：${summary}。請針對活動密集度與分類多樣性提供 3 點企劃建議。`, "你是一位資深遊戲營運專家。");
-            };
-
-            // --- 數據操作 ---
-            const handleAddActivity = async (e) => {
+            // --- 操作邏輯 ---
+            const handleAddActivity = (e) => {
                 e.preventDefault();
                 if (!newActivityName) return;
-                const updatedActs = [...activities, {
+                const newActs = [...activities, {
                     name: newActivityName,
                     category: newActivityCategory,
                     data: new Array(dates.length).fill("")
                 }];
                 setNewActivityName('');
-                await saveToCloud(dates, updatedActs);
+                saveData(dates, newActs);
             };
 
-            const toggleStatus = async (actIdx, dateIdx) => {
+            const toggleStatus = (actIdx, dateIdx) => {
                 if (!showManager) return;
                 const updated = [...activities];
                 updated[actIdx].data[dateIdx] = updated[actIdx].data[dateIdx] === "O" ? "" : "O";
-                setActivities(updated);
-                await saveToCloud(dates, updated);
+                saveData(dates, updated);
             };
 
-            const handleDeleteActivity = async (idx) => {
+            const handleDeleteActivity = (idx) => {
                 const updated = activities.filter((_, i) => i !== idx);
-                await saveToCloud(dates, updated);
+                saveData(dates, updated);
             };
 
-            const handleAddDate = async (e) => {
+            const handleAddDate = (e) => {
                 e.preventDefault();
                 if (!newDate) return;
                 const combined = [...dates, newDate].sort();
@@ -270,33 +196,16 @@
                     return { ...act, data: newData };
                 });
                 setNewDate('');
-                await saveToCloud(combined, updatedActs);
+                saveData(combined, updatedActs);
             };
 
-            const handleDeleteDate = async (idx) => {
+            const handleDeleteDate = (idx) => {
                 const updatedDates = dates.filter((_, i) => i !== idx);
                 const updatedActs = activities.map(act => ({
                     ...act,
                     data: act.data.filter((_, i) => i !== idx)
                 }));
-                await saveToCloud(updatedDates, updatedActs);
-            };
-
-            // 樣式輔助
-            const getCategoryStyle = (cat, isSelected) => {
-                const base = "px-4 py-1.5 rounded-full text-sm font-bold border transition-all cursor-pointer whitespace-nowrap shadow-sm";
-                if (cat === '全部') return isSelected ? `${base} bg-slate-800 text-white border-slate-800` : `${base} bg-white text-slate-600 border-slate-200 hover:bg-slate-50`;
-                const colors = {
-                    '獎勵': isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200',
-                    '戰鬥': isSelected ? 'bg-red-600 text-white border-red-600' : 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200',
-                    '系統': isSelected ? 'bg-slate-600 text-white border-slate-600' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200',
-                    '任務': isSelected ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200',
-                    '加倍': isSelected ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200',
-                    '副本': isSelected ? 'bg-purple-600 text-white border-purple-600' : 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200',
-                    '裝扮': isSelected ? 'bg-pink-600 text-white border-pink-600' : 'bg-pink-100 text-pink-700 border-pink-200 hover:bg-pink-200',
-                    '小遊戲': isSelected ? 'bg-orange-600 text-white border-orange-600' : 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200',
-                };
-                return colors[cat] || (isSelected ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700');
+                saveData(updatedDates, updatedActs);
             };
 
             const filteredActivities = useMemo(() => {
@@ -307,89 +216,97 @@
                 });
             }, [activities, searchTerm, selectedCategory]);
 
-            if (loading) return (
-                <div className="h-screen flex items-center justify-center bg-slate-50">
-                    <div className="text-center">
-                        <div className="inline-block w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                        <p className="mt-4 font-bold text-slate-600 animate-pulse">正在同步雲端數據...</p>
-                    </div>
-                </div>
-            );
+            const getCategoryStyle = (cat, isSelected) => {
+                const base = "px-4 py-1.5 rounded-full text-sm font-bold border transition-all cursor-pointer whitespace-nowrap shadow-sm";
+                if (cat === '全部') return isSelected ? `${base} bg-slate-800 text-white border-slate-800` : `${base} bg-white text-slate-600 border-slate-200 hover:bg-slate-50`;
+                const colors = {
+                    '獎勵': isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-100 text-blue-700 border-blue-200',
+                    '戰鬥': isSelected ? 'bg-red-600 text-white border-red-600' : 'bg-red-100 text-red-700 border-red-200',
+                    '系統': isSelected ? 'bg-slate-600 text-white border-slate-600' : 'bg-slate-100 text-slate-700 border-slate-200',
+                    '任務': isSelected ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-100 text-emerald-700 border-emerald-200',
+                    '加倍': isSelected ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-100 text-amber-700 border-amber-200',
+                    '副本': isSelected ? 'bg-purple-600 text-white border-purple-600' : 'bg-purple-100 text-purple-700 border-purple-200',
+                    '裝扮': isSelected ? 'bg-pink-600 text-white border-pink-600' : 'bg-pink-100 text-pink-700 border-pink-200',
+                    '小遊戲': isSelected ? 'bg-orange-600 text-white border-orange-600' : 'bg-orange-100 text-orange-700 border-orange-200',
+                };
+                return colors[cat] || (isSelected ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700');
+            };
 
             return (
                 <div className="p-4 md:p-8">
                     <div className="max-w-[1440px] mx-auto">
-                        {/* 標題與工具列 */}
+                        {/* Header */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-6">
                             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                                 <div>
                                     <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
                                         <Icon name="calendar" size={32} className="text-blue-600" />
                                         活動總整理
-                                        <button onClick={handleAiHealthCheck} className="text-xs bg-purple-100 text-purple-600 px-3 py-1 rounded-full hover:bg-purple-200 transition-all font-bold flex items-center gap-1 shadow-sm border border-purple-200">
+                                        <button onClick={() => callGemini("分析排程健康度", "分析專家")} className="text-xs bg-purple-100 text-purple-600 px-3 py-1 rounded-full hover:bg-purple-200 font-bold flex items-center gap-1 shadow-sm border border-purple-200">
                                             <Icon name="sparkles" size={14} /> AI 健檢
                                         </button>
                                     </h1>
-                                    <p className="text-slate-500 mt-2">支援雲端同步與十字凍結窗格。開啟管理面板即可切換狀態或刪除項目。</p>
+                                    <p className="text-slate-500 mt-2">網頁版 (資料儲存於瀏覽器)。</p>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <div className="relative group">
+                                    <div className="relative">
                                         <Icon name="search" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input 
-                                            type="text" 
-                                            placeholder="搜尋活動名稱..." 
-                                            className="pl-10 pr-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full md:w-72 transition-all"
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                        />
+                                        <input type="text" placeholder="搜尋..." className="pl-10 pr-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-full md:w-72" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                                     </div>
-                                    <button 
-                                        onClick={() => setShowManager(!showManager)}
-                                        className={`px-5 py-3 rounded-xl font-bold border transition-all flex items-center gap-2 shadow-sm ${showManager ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-                                    >
-                                        <Icon name="settings-2" size={20} />
-                                        管理面板
+                                    <button onClick={() => setShowManager(!showManager)} className={`px-5 py-3 rounded-xl font-bold border transition-all flex items-center gap-2 shadow-sm ${showManager ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200'}`}>
+                                        <Icon name="settings-2" size={20} /> 管理面板
                                     </button>
                                 </div>
                             </div>
 
+                            {/* Manager Panel */}
                             {showManager && (
                                 <div className="mt-8 pt-8 border-t grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-top-4 duration-300">
                                     <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-inner">
-                                        <h3 className="font-bold text-slate-700 mb-4 flex items-center justify-between">
-                                            <span className="flex items-center gap-2"><Icon name="plus" size={18} /> 新增活動項目</span>
-                                            <button onClick={() => callGemini("建議 3 個遊戲內活動點子", "活動企劃專家")} className="text-xs text-purple-600 flex items-center gap-1 hover:underline"><Icon name="sparkles" size={12} /> AI 建議</button>
-                                        </h3>
+                                        <h3 className="font-bold text-slate-700 mb-4 flex justify-between"><span className="flex items-center gap-2"><Icon name="plus" size={18} /> 新增活動</span> <button onClick={() => callGemini("建議3個活動", "企劃專家")} className="text-xs text-purple-600 flex items-center gap-1"><Icon name="sparkles" size={12}/> AI 建議</button></h3>
                                         <form onSubmit={handleAddActivity} className="space-y-4">
-                                            <input type="text" value={newActivityName} onChange={e => setNewActivityName(e.target.value)} placeholder="活動名稱" className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"/>
-                                            <select value={newActivityCategory} onChange={e => setNewActivityCategory(e.target.value)} className="w-full p-3 border rounded-xl outline-none bg-white">
+                                            <input type="text" value={newActivityName} onChange={e => setNewActivityName(e.target.value)} placeholder="名稱" className="w-full p-3 border rounded-xl"/>
+                                            <select value={newActivityCategory} onChange={e => setNewActivityCategory(e.target.value)} className="w-full p-3 border rounded-xl bg-white">
                                                 {categories.filter(c => c !== '全部').map(c => <option key={c} value={c}>{c}</option>)}
                                             </select>
-                                            <button className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-shadow shadow-md">確認新增項目</button>
+                                            <button className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl">確認新增</button>
                                         </form>
                                     </div>
                                     <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-inner">
-                                        <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Icon name="calendar" size={18} /> 新增活動日期</h3>
+                                        <h3 className="font-bold text-slate-700 mb-4 flex gap-2"><Icon name="calendar" size={18} /> 新增日期</h3>
                                         <form onSubmit={handleAddDate} className="space-y-4">
-                                            <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white"/>
-                                            <div className="h-12 hidden md:block"></div>
-                                            <button className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700 transition-shadow shadow-md">確認新增日期</button>
+                                            <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="w-full p-3 border rounded-xl bg-white"/>
+                                            <div className="h-12 md:block hidden"></div>
+                                            <button className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl">確認日期</button>
                                         </form>
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* 分類篩選按鈕 */}
+                        {/* API Key Modal */}
+                        {showKeyInput && (
+                            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+                                <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md">
+                                    <h3 className="text-xl font-bold mb-4">設定 Gemini API Key</h3>
+                                    <p className="text-sm text-slate-500 mb-4">要在網頁版使用 AI 功能，請輸入您的 Google Gemini API Key。</p>
+                                    <input type="password" placeholder="貼上 API Key..." className="w-full p-3 border rounded-xl mb-4" onKeyDown={(e) => {if(e.key === 'Enter') saveApiKey(e.target.value)}} />
+                                    <div className="flex justify-end gap-2">
+                                        <button onClick={() => setShowKeyInput(false)} className="px-4 py-2 text-slate-500">取消</button>
+                                        <button onClick={(e) => saveApiKey(e.target.previousSibling.value)} className="px-4 py-2 bg-blue-600 text-white rounded-lg">儲存</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Filters */}
                         <div className="flex gap-2 mb-8 overflow-x-auto no-scrollbar pb-2">
                             {categories.map(cat => (
-                                <button key={cat} onClick={() => setSelectedCategory(cat)} className={getCategoryStyle(cat, selectedCategory === cat)}>
-                                    {cat}
-                                </button>
+                                <button key={cat} onClick={() => setSelectedCategory(cat)} className={getCategoryStyle(cat, selectedCategory === cat)}>{cat}</button>
                             ))}
                         </div>
 
-                        {/* 十字凍結表格 */}
+                        {/* Table */}
                         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
                             <div className="overflow-auto max-h-[650px]">
                                 <table className="w-full border-separate border-spacing-0 text-left">
@@ -397,102 +314,65 @@
                                         <tr>
                                             <th className="sticky-intersect bg-slate-100 px-6 py-5 font-bold text-slate-700 border-r border-b" style={{ minWidth: colWidths.name }}>活動名稱</th>
                                             <th className="sticky-header bg-slate-100 px-5 py-5 font-bold text-slate-700 border-r border-b sticky-col-2" style={{ left: colWidths.name, minWidth: colWidths.category }}>分類</th>
-                                            <th className="sticky-header px-5 py-5 text-center font-bold text-blue-800 border-r-2 border-b bg-blue-50 sticky-col-3 shadow-[2px_0_5px_rgba(0,0,0,0.05)]" style={{ left: colWidths.name + colWidths.category, minWidth: colWidths.total }}>總數</th>
+                                            <th className="sticky-header px-5 py-5 text-center font-bold text-blue-800 border-r-2 border-b bg-blue-50 sticky-col-3" style={{ left: colWidths.name + colWidths.category, minWidth: colWidths.total }}>總數</th>
                                             {dates.map((d, i) => (
                                                 <th key={i} className="sticky-header bg-slate-100 px-5 py-5 text-center font-bold text-slate-500 min-w-[130px] border-b border-r last:border-r-0">
                                                     <div className="flex flex-col items-center">
                                                         <span className="text-sm">{d.replace('2025-', '').replace('-', '/')}</span>
-                                                        {showManager && (
-                                                            <button onClick={() => handleDeleteDate(i)} className="text-[11px] text-red-400 mt-2 hover:text-red-600 flex items-center gap-0.5"><Icon name="x" size={10} /> 刪除</button>
-                                                        )}
+                                                        {showManager && <button onClick={() => handleDeleteDate(i)} className="text-[11px] text-red-400 mt-2 flex items-center gap-0.5 hover:text-red-600"><Icon name="x" size={10}/> 刪除</button>}
                                                     </div>
                                                 </th>
                                             ))}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {filteredActivities.length > 0 ? (
-                                            filteredActivities.map((act, fIdx) => {
-                                                const globalIdx = activities.indexOf(act);
-                                                const count = act.data.filter(c => c === 'O').length;
-                                                return (
-                                                    <tr key={fIdx} className="hover:bg-blue-50/40 transition-colors group">
-                                                        <td className="sticky-col-1 px-6 py-4 font-bold text-slate-800 border-r border-b group-hover:bg-blue-50/10">
-                                                            <div className="flex justify-between items-center gap-2">
-                                                                <span className="truncate">{act.name}</span>
-                                                                {showManager && (
-                                                                    <button onClick={() => handleDeleteActivity(globalIdx)} className="opacity-0 group-hover:opacity-100 text-red-500 p-1 hover:bg-red-50 rounded transition-all"><Icon name="trash-2" size={16}/></button>
-                                                                )}
-                                                            </div>
+                                        {filteredActivities.length > 0 ? filteredActivities.map((act, fIdx) => {
+                                            const globalIdx = activities.indexOf(act);
+                                            const count = act.data.filter(c => c === 'O').length;
+                                            return (
+                                                <tr key={fIdx} className="hover:bg-blue-50/40 transition-colors group">
+                                                    <td className="sticky-col-1 px-6 py-4 font-bold text-slate-800 border-r border-b group-hover:bg-blue-50/10">
+                                                        <div className="flex justify-between items-center gap-2">
+                                                            <span className="truncate">{act.name}</span>
+                                                            {showManager && <button onClick={() => handleDeleteActivity(globalIdx)} className="opacity-0 group-hover:opacity-100 text-red-500 p-1 hover:bg-red-50 rounded transition-all"><Icon name="trash-2" size={16}/></button>}
+                                                        </div>
+                                                    </td>
+                                                    <td className="sticky-col-2 px-5 py-4 border-r border-b group-hover:bg-blue-50/10" style={{ left: colWidths.name }}>
+                                                        <span className="text-xs px-3 py-1 border rounded-full font-bold bg-white text-slate-600 shadow-sm">{act.category}</span>
+                                                    </td>
+                                                    <td className="sticky-col-3 px-5 py-4 border-r-2 border-b text-center font-black text-blue-600 group-hover:bg-blue-50/20" style={{ left: colWidths.name + colWidths.category }}>{count}</td>
+                                                    {act.data.map((cell, cIdx) => (
+                                                        <td key={cIdx} onClick={() => toggleStatus(globalIdx, cIdx)} className={`px-5 py-4 text-center border-r border-b last:border-r-0 ${showManager ? 'cursor-pointer hover:bg-blue-50' : 'cursor-default'}`}>
+                                                            {cell === 'O' ? <div className="flex justify-center"><Icon name="check-circle-2" size={24} className="text-blue-600 fill-blue-50" /></div> : <span className="text-slate-200">—</span>}
                                                         </td>
-                                                        <td className="sticky-col-2 px-5 py-4 border-r border-b group-hover:bg-blue-50/10" style={{ left: colWidths.name }}>
-                                                            <span className="text-xs px-3 py-1 border rounded-full font-bold bg-white text-slate-600 shadow-sm">{act.category}</span>
-                                                        </td>
-                                                        <td className="sticky-col-3 px-5 py-4 border-r-2 border-b text-center font-black text-blue-600 shadow-[2px_0_5px_rgba(0,0,0,0.02)] group-hover:bg-blue-50/20" style={{ left: colWidths.name + colWidths.category }}>{count}</td>
-                                                        {act.data.map((cell, cIdx) => (
-                                                            <td 
-                                                                key={cIdx} 
-                                                                onClick={() => toggleStatus(globalIdx, cIdx)} 
-                                                                className={`px-5 py-4 text-center border-r border-b last:border-r-0 transition-colors ${showManager ? 'cursor-pointer hover:bg-blue-50' : 'cursor-default'}`}
-                                                            >
-                                                                {cell === 'O' ? (
-                                                                    <div className="flex justify-center">
-                                                                        <Icon name="check-circle-2" size={24} className="text-blue-600 fill-blue-50" />
-                                                                    </div>
-                                                                ) : (
-                                                                    <span className="text-slate-200">—</span>
-                                                                )}
-                                                            </td>
-                                                        ))}
-                                                    </tr>
-                                                );
-                                            })
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={dates.length + 3} className="px-6 py-24 text-center text-slate-400 italic font-bold">目前沒有符合搜尋條件的活動。</td>
-                                            </tr>
-                                        )}
+                                                    ))}
+                                                </tr>
+                                            )
+                                        }) : <tr><td colSpan={dates.length+3} className="px-6 py-24 text-center text-slate-400 italic">無符合項目</td></tr>}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
 
-                        {/* AI 彈出視窗 */}
+                        {/* AI Result Modal */}
                         {showAiModal && (
                             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                                 <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 animate-in zoom-in duration-300">
                                     <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 flex justify-between items-center text-white font-bold">
-                                        <div className="flex items-center gap-3">
-                                            <Icon name="sparkles" size={24} /> 
-                                            <span className="text-xl">Gemini AI 創意助手 ✨</span>
-                                        </div>
-                                        <button onClick={() => setShowAiModal(false)} className="hover:bg-white/20 p-2 rounded-full transition-colors">
-                                            <Icon name="x" size={24} />
-                                        </button>
+                                        <div className="flex items-center gap-3"><Icon name="sparkles" size={24} /> <span className="text-xl">AI 創意助手</span></div>
+                                        <button onClick={() => setShowAiModal(false)} className="hover:bg-white/20 p-2 rounded-full"><Icon name="x" size={24} /></button>
                                     </div>
                                     <div className="p-8 bg-slate-50 max-h-[65vh] overflow-y-auto">
-                                        {isAiLoading ? (
-                                            <div className="flex flex-col items-center py-12 gap-5">
-                                                <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                                <p className="font-bold text-slate-500 animate-pulse text-lg">正在分析數據與產生創意中...</p>
-                                            </div>
-                                        ) : (
-                                            <div className="whitespace-pre-line leading-relaxed text-slate-700 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-lg">
-                                                {aiResult}
-                                            </div>
-                                        )}
+                                        {isAiLoading ? <p className="text-center text-slate-500 font-bold animate-pulse py-10">AI 正在思考中...</p> : <div className="whitespace-pre-line leading-relaxed text-slate-700 bg-white p-8 rounded-2xl border shadow-sm">{aiResult}</div>}
                                     </div>
                                     <div className="p-5 bg-white border-t flex justify-end">
-                                        <button onClick={() => setShowAiModal(false)} className="bg-slate-800 text-white px-10 py-3 rounded-2xl font-bold hover:bg-slate-700 transition-all shadow-md active:scale-95">關閉助手</button>
+                                        <button onClick={() => setShowAiModal(false)} className="bg-slate-800 text-white px-10 py-3 rounded-2xl font-bold">關閉</button>
                                     </div>
                                 </div>
                             </div>
                         )}
-                        
-                        <div className="mt-10 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
-                            <Icon name="activity" size={14} />
-                            <p>© 2025 活動管理系統 - 智慧雲端專業版</p>
-                        </div>
+
+                        <div className="mt-10 text-center text-slate-400 text-sm">© 2025 活動管理系統 - GitHub Pages 版</div>
                     </div>
                 </div>
             );
