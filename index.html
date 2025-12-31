@@ -11,8 +11,8 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Lucide Icons (使用穩定的 UMD 版本) -->
+    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
     <style>
         body {
             font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
@@ -29,27 +29,56 @@
         .sticky-intersect { position: sticky; top: 0; left: 0; z-index: 60; }
         
         th, td { border: 1px solid #e2e8f0; }
+        
+        /* 載入動畫 */
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="bg-slate-50">
-    <div id="root"></div>
+    <div id="root">
+        <!-- 預設載入畫面，React 啟動後會取代這裡 -->
+        <div style="text-align: center; padding-top: 100px; color: #64748b;">
+            <div class="loading-spinner"></div>
+            <p>系統載入中...</p>
+            <p style="font-size: 12px; margin-top: 10px;">如果長時間停留在此畫面，請嘗試重新整理。</p>
+        </div>
+    </div>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // 圖示組件
+        // 圖示組件 (安全版)
         const Icon = ({ name, size = 20, className = "" }) => {
             const elementRef = useRef(null);
             useEffect(() => {
+                // 確保 window.lucide 存在才執行，避免報錯
                 if (window.lucide && elementRef.current) {
                     const tempIcon = document.createElement('i');
                     tempIcon.setAttribute('data-lucide', name);
                     elementRef.current.innerHTML = '';
                     elementRef.current.appendChild(tempIcon);
-                    window.lucide.createIcons({
-                        root: elementRef.current,
-                        attrs: { width: size, height: size, class: className, 'stroke-width': 2, stroke: 'currentColor' }
-                    });
+                    
+                    // 使用 Lucide UMD API
+                    try {
+                        window.lucide.createIcons({
+                            root: elementRef.current,
+                            attrs: { width: size, height: size, class: className, 'stroke-width': 2, stroke: 'currentColor' }
+                        });
+                    } catch (e) {
+                        console.warn("Icon render error:", e);
+                    }
                 }
             }, [name, size, className]);
             return <span ref={elementRef} className="inline-flex items-center justify-center"></span>;
@@ -84,7 +113,7 @@
             const [searchTerm, setSearchTerm] = useState('');
             const [selectedCategory, setSelectedCategory] = useState('全部');
             const [showManager, setShowManager] = useState(false);
-            const [apiKey, setApiKey] = useState(''); // 讓使用者自行輸入 Key
+            const [apiKey, setApiKey] = useState('');
 
             // 表單 State
             const [newActivityName, setNewActivityName] = useState('');
@@ -100,34 +129,41 @@
             const categories = ['全部', '獎勵', '戰鬥', '系統', '任務', '加倍', '副本', '裝扮', '小遊戲'];
             const colWidths = { name: 260, category: 110, total: 90 };
 
-            // 1. 初始化讀取 LocalStorage
+            // 1. 初始化讀取 LocalStorage (安全讀取)
             useEffect(() => {
-                const savedData = localStorage.getItem('activityDashboardData');
-                if (savedData) {
-                    try {
+                try {
+                    const savedData = localStorage.getItem('activityDashboardData');
+                    if (savedData) {
                         const parsed = JSON.parse(savedData);
-                        setDates(parsed.dates || initialDates);
-                        setActivities(parsed.activities || initialActivities);
-                    } catch (e) { console.error("讀取失敗", e); }
+                        if(parsed.dates && parsed.activities) {
+                            setDates(parsed.dates);
+                            setActivities(parsed.activities);
+                        }
+                    }
+                    const savedKey = localStorage.getItem('geminiApiKey');
+                    if (savedKey) setApiKey(savedKey);
+                } catch (e) {
+                    console.error("讀取存檔失敗 (可能是隱私瀏覽模式):", e);
                 }
-                
-                const savedKey = localStorage.getItem('geminiApiKey');
-                if (savedKey) setApiKey(savedKey);
             }, []);
 
-            // 2. 儲存資料到 LocalStorage
+            // 2. 儲存資料到 LocalStorage (安全寫入)
             const saveData = (newDates, newActs) => {
                 setDates(newDates);
                 setActivities(newActs);
-                localStorage.setItem('activityDashboardData', JSON.stringify({
-                    dates: newDates,
-                    activities: newActs
-                }));
+                try {
+                    localStorage.setItem('activityDashboardData', JSON.stringify({
+                        dates: newDates,
+                        activities: newActs
+                    }));
+                } catch (e) {
+                    console.warn("無法寫入存檔:", e);
+                }
             };
 
             const saveApiKey = (key) => {
                 setApiKey(key);
-                localStorage.setItem('geminiApiKey', key);
+                try { localStorage.setItem('geminiApiKey', key); } catch(e){}
                 setShowKeyInput(false);
             };
 
